@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ship Track Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src=" https://unpkg.com/@joergdietrich/leaflet.terminator@1.0.0/L.Terminator.js"></script>
+
+<script>
+  let map;
+  let trackLine; // Keep reference to the existing polyline
+  let shipMarker; // Live ship position marker
+  let terminator;
+
+  const shipIcon = L.icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/7890/7890236.png', // or use a local image
+    iconSize: [32, 32],
+    iconAnchor: [16, 16], // center the icon
+    popupAnchor: [0, -16]
+  });
+
+  async function fetchTrack() {
+    try {
+      const response = await fetch('/get_track_data');
+      if (!response.ok) throw new Error(`Server error ${response.status}`);
+      const data = await response.json();
+      return data.track;
+    } catch (error) {
+      console.error("Error fetching track:", error);
+      return [];
+    }
+  }
+
+  async function updateTrack() {
+    const track = await fetchTrack();
+    if (track.length === 0) return;
+
+    const latlngs = track.map(p => [p.lat, p.lng]);
+
+    // Remove previous line if it exists
+    if (trackLine) {
+      map.removeLayer(trackLine);
+    }
+
+    // Draw new line
+    trackLine = L.polyline(latlngs, { color: 'red' }).addTo(map);
+
+    // Optional: zoom to new track
+    //map.fitBounds(trackLine.getBounds());
+
+    // Get last point for ship position
+    const lastPoint = latlngs[latlngs.length - 1];
+  
+    // Add or move ship marker
+    if (!shipMarker) {
+      shipMarker = L.marker(lastPoint, {
+        icon: shipIcon,
+        title: "Current Ship Position"
+      }).addTo(map);
+    } else {
+      shipMarker.setLatLng(lastPoint);
+    }
+  }
+
+async function initMap() {
+  map = L.map('map').setView([0, 0], 3);
+
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  const bathyLayer = L.tileLayer.wms('https://www.gebco.net/data_and_products/gebco_web_services/web_map_service/mapserv?', {
+    layers: 'GEBCO_LATEST',
+    format: 'image/png',
+    transparent: true,
+    attribution: '&copy; GEBCO 2023',
+    opacity: 0.5
+  });
+
+  // Create the day/night terminator layer
+  terminator = L.terminator();
+
+  // Update terminator every 5 min
+  setInterval(() => {
+    if (terminator) {
+      terminator.setTime(new Date());
+      terminator.redraw();
+    }
+  }, 5 * 60 * 1000);
+
+  // Layer controls
+  const baseMaps = {
+    "OpenStreetMap": osm
+  };
+
+  const overlayMaps = {
+    "GEBCO Bathymetry": bathyLayer,
+    "Day/Night Terminator": terminator
+  };
+
+  L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+  // Load track + ship marker
+  await updateTrack();
+
+  // Refresh track every 5 min
+  setInterval(updateTrack, 5 * 60 * 1000);
+}
+
+  initMap();
+</script>
+</body>
+</html>
