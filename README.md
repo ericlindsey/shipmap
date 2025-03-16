@@ -52,3 +52,7 @@ shipmap/
 ├── templates/
 │   └── index.html         # Leaflet map page
 ```
+
+### Example:
+![Screenshot](screenshot.jpg)
+
