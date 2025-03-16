@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, Response
 import requests
 from bs4 import BeautifulSoup
 import time
@@ -16,6 +16,15 @@ lock = threading.Lock()
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/get_waypoints')
+def get_waypoints():
+    try:
+        with open('waypoints.txt', 'r') as f:
+            lines = f.readlines()
+        return Response("".join(lines), headers={"Access-Control-Allow-Origin": "*"})
+    except Exception as e:
+        return Response(f"Error: {e}", status=500)
 
 @app.route('/get_track_data')
 def get_track_data():
