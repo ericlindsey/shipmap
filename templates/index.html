@@ -11,11 +11,38 @@
   <style>
     body { margin: 0; padding: 0; }
     #map { height: 100vh; }
+  
+    .ship-marker {
+      transition: transform 0.2s ease;
+    }
+
+    .flip-horizontal {
+      transform: scaleX(-1);
+    }
+
+    .circle-label {
+      font-size: 12px;
+      font-weight: bold;
+      color: navy;
+      background: transparent;
+      border: none;
+      padding: 0;
+      margin: 0;
+      white-space: nowrap;
+      box-shadow: none;
+    }
+
+    .speed-control {
+      background: white;
+      padding: 6px;
+      border-radius: 4px;
+      box-shadow: 0 0 4px rgba(0,0,0,0.2);
+      font-family: sans-serif;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
-
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -26,13 +53,18 @@
   let trackLine; // Keep reference to the existing polyline
   let shipMarker; // Live ship position marker
   let terminator;
+  let shipPosition = null;
+  let shipSpeedKnots = 13;
+  let rangeCircleLayer = L.layerGroup();
 
-  const shipIcon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/7890/7890236.png', // or use a local image
-    iconSize: [32, 32],
-    iconAnchor: [16, 16], // center the icon
-    popupAnchor: [0, -16]
-  });
+  function getShipIcon(isEastbound = true) {
+    return L.divIcon({
+      className: '', // disable default Leaflet styling
+      html: `<div class="ship-marker ${isEastbound ? 'flip-horizontal' : ''}" style="background-image: url('/static/ship_icon.png'); width: 32px; height: 32px; background-size: contain; background-repeat: no-repeat;"></div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+  }
 
   async function fetchTrack() {
     try {
@@ -43,6 +75,48 @@
     } catch (error) {
       console.error("Error fetching track:", error);
       return [];
+    }
+  }
+
+  function updateRangeCircles() {
+    if (!shipMarker) return;
+  
+    rangeCircleLayer.clearLayers(); // remove old rings + labels
+  
+    const center = shipMarker.getLatLng();
+    const hours = [6, 12, 24];
+    const metersPerKnotPerHour = 1852;
+  
+    for (const h of hours) {
+      const radiusMeters = shipSpeedKnots * h * metersPerKnotPerHour;
+  
+      // 1. Add the circle
+      const circle = L.circle(center, {
+        radius: radiusMeters,
+        color: 'blue',
+        fill: false,
+        weight: 1,
+        dashArray: '4,4'
+      });
+      rangeCircleLayer.addLayer(circle);
+  
+      // 2. Add a label marker just north of the circle
+      const labelLatLng = L.latLng(
+        center.lat + (radiusMeters / 1000) / 111.32, // 1 deg ≈ 111.32 km
+        center.lng
+      );
+  
+      const label = L.marker(labelLatLng, {
+        icon: L.divIcon({
+          className: 'circle-label',
+          html: `<div>${h}h</div>`,
+          iconSize: [30, 12],
+          iconAnchor: [15, 6]
+        }),
+        interactive: false // prevents hover/click effects
+      });
+  
+      rangeCircleLayer.addLayer(label);
     }
   }
 
@@ -65,15 +139,74 @@
 
     // Get last point for ship position
     const lastPoint = latlngs[latlngs.length - 1];
+    shipPosition = L.latLng(lastPoint);
+
+    // flip the icon if the ship is moving east
+    const prev = latlngs[latlngs.length - 2];
+    
+    // Determine ship direction
+    const isEastbound = lastPoint[1] > prev[1]; // comparing longitudes
   
     // Add or move ship marker
     if (!shipMarker) {
       shipMarker = L.marker(lastPoint, {
-        icon: shipIcon,
-        title: "Current Ship Position"
+        icon: getShipIcon(isEastbound),
+        title: "Current Position"
       }).addTo(map);
     } else {
       shipMarker.setLatLng(lastPoint);
+      shipMarker.setIcon(getShipIcon(isEastbound));
+    }
+    updateRangeCircles();
+
+
+  }
+
+  async function loadWaypoints() {
+    const response = await fetch('/get_waypoints');
+    if (!response.ok) {
+      console.error("Failed to load waypoints");
+      return;
+    }
+  
+    const text = await response.text();
+    const lines = text.trim().split('\n');
+  
+    for (const line of lines) {
+      const parts = line.split(',');
+      if (parts.length < 2) continue;
+  
+      const lat = parseFloat(parts[0].trim());
+      const lng = parseFloat(parts[1].trim());
+      const label = parts[2] ? parts[2].trim() : 'Waypoint';
+  
+      const waypointLatLng = L.latLng(lat, lng);
+  
+      const marker = L.marker(waypointLatLng, {
+        title: label
+      });
+      
+      // Bind empty popup once
+      marker.bindPopup('Loading ETA...');
+      
+      marker.on('click', () => {
+        if (!shipPosition || shipSpeedKnots <= 0) {
+          marker.setPopupContent(`${label}<br>ETA: Unknown`);
+        } else {
+          const distanceMeters = shipPosition.distanceTo(waypointLatLng);
+          const distanceNauticalMiles = distanceMeters / 1852;
+          const hours = distanceNauticalMiles / shipSpeedKnots;
+      
+          const etaH = Math.floor(hours);
+          const etaM = Math.round((hours - etaH) * 60);
+      
+          marker.setPopupContent(`${label}<br>ETA: ${etaH}h ${etaM}m`);
+        }
+      
+        marker.openPopup();
+      });
+      
+      marker.addTo(map);
     }
   }
 
@@ -91,6 +224,8 @@ async function initMap() {
     attribution: '&copy; GEBCO 2023',
     opacity: 0.5
   });
+
+  rangeCircleLayer.addTo(map);
 
   // Create the day/night terminator layer
   terminator = L.terminator();
@@ -110,19 +245,59 @@ async function initMap() {
 
   const overlayMaps = {
     "GEBCO Bathymetry": bathyLayer,
-    "Day/Night Terminator": terminator
+    "Day/Night Terminator": terminator,
+    "Distance Rings": rangeCircleLayer
   };
 
   L.control.layers(baseMaps, overlayMaps).addTo(map);
 
+  new L.Control.SpeedInput({ position: 'topright' }).addTo(map);
+
+  // Set initial speed from input box
+  shipSpeedKnots = parseFloat(document.getElementById('speedInput').value);
+
+  // Watch for speed changes and update rings
+  document.getElementById('speedInput').addEventListener('input', () => {
+    shipSpeedKnots = parseFloat(document.getElementById('speedInput').value);
+    updateRangeCircles();
+  });
+
   // Load track + ship marker
   await updateTrack();
 
+  // Load waypoints
+  await loadWaypoints();
+
   // Refresh track every 5 min
   setInterval(updateTrack, 5 * 60 * 1000);
+  setInterval(loadWaypoints, 5 * 60 * 1000);
 }
 
+
+  L.Control.SpeedInput = L.Control.extend({
+    onAdd: function (map) {
+      const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control speed-control');
+  
+      container.innerHTML = `
+        <label style="font-size: 12px; display: block; text-align: center;">
+          Speed<br>
+          <input id="speedInput" type="number" value="13" step="0.1" min="0" style="width: 50px; text-align: center;" />
+          <div style="font-size: 10px;">knots</div>
+        </label>
+      `;
+  
+      // Prevent map from zooming when interacting with input
+      L.DomEvent.disableClickPropagation(container);
+      return container;
+    },
+  
+    onRemove: function (map) {
+      // Nothing to do here
+    }
+  });
+
   initMap();
+
 </script>
 </body>
 </html>
