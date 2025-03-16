@@ -41,18 +41,6 @@ Then browse to:
 http://localhost:5000/
 ```
 
-### Folder structure:
-```
-shipmap/
-├── app.py                 # Flask server
-├── requirements.txt       # Python dependencies
-├── run_shipmap.bat        # Windows launcher script
-├── README.md              # This file
-├── README-windows.txt     # For lab users
-├── templates/
-│   └── index.html         # Leaflet map page
-```
-
 ### Example:
 ![Screenshot](screenshot.jpg)
 
