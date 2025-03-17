@@ -57,6 +57,18 @@
   let shipSpeedKnots = 13;
   let rangeCircleLayer = L.layerGroup();
 
+  function toDegMin(dec, isLat = false) {
+    const dir = isLat
+      ? (dec >= 0 ? 'N' : 'S')
+      : (dec >= 0 ? 'E' : 'W');
+  
+    const abs = Math.abs(dec);
+    const deg = Math.floor(abs);
+    const min = (abs - deg) * 60;
+  
+    return `${deg}° ${min.toFixed(3)}' ${dir}`;
+  }
+
   function getShipIcon(isEastbound = true) {
     return L.divIcon({
       className: '', // disable default Leaflet styling
@@ -153,6 +165,16 @@
         icon: getShipIcon(isEastbound),
         title: "Current Position"
       }).addTo(map);
+      // Bind empty popup once
+      shipMarker.bindPopup('Loading Ship...');
+
+      shipMarker.on('click', () => {
+      const pos = shipMarker.getLatLng();
+      const latStr = toDegMin(pos.lat, true);
+      const lonStr = toDegMin(pos.lng, false);
+
+      shipMarker.setPopupContent(`Ship Position:<br>${latStr}<br>${lonStr}`).openPopup();
+      });
     } else {
       shipMarker.setLatLng(lastPoint);
       shipMarker.setIcon(getShipIcon(isEastbound));
@@ -190,8 +212,11 @@
       marker.bindPopup('Loading ETA...');
       
       marker.on('click', () => {
+        const latStr = toDegMin(lat, true);
+        const lonStr = toDegMin(lng, false);
+        
         if (!shipPosition || shipSpeedKnots <= 0) {
-          marker.setPopupContent(`${label}<br>ETA: Unknown`);
+          marker.setPopupContent(`${label}<br>${latStr}<br>${lonStr}<br>ETA: Unknown`);
         } else {
           const distanceMeters = shipPosition.distanceTo(waypointLatLng);
           const distanceNauticalMiles = distanceMeters / 1852;
@@ -200,18 +225,20 @@
           const etaH = Math.floor(hours);
           const etaM = Math.round((hours - etaH) * 60);
       
-          marker.setPopupContent(`${label}<br>ETA: ${etaH}h ${etaM}m`);
+          marker.setPopupContent(`${label}<br>${latStr}<br>${lonStr}<br>ETA: ${etaH}h ${etaM}m`);
         }
       
         marker.openPopup();
       });
       
       marker.addTo(map);
+
     }
   }
 
 async function initMap() {
   map = L.map('map').setView([0, 0], 3);
+  L.control.scale({ imperial: false }).addTo(map);
 
   const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
