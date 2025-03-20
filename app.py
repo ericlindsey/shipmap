@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, Response
+from flask import Flask, jsonify, render_template, Response, send_from_directory
 import requests
 from bs4 import BeautifulSoup
 import time
@@ -16,6 +16,11 @@ lock = threading.Lock()
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/tiles/<path:filename>')
+def serve_tiles(filename):
+    print("Request for:", filename)
+    return send_from_directory('tiles', filename)
 
 @app.route('/get_waypoints')
 def get_waypoints():

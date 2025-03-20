@@ -244,6 +244,13 @@ async function initMap() {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
+  // Create a custom pane for hillshades
+  map.createPane('hillshadePane');
+  map.getPane('hillshadePane').style.zIndex = 400;
+
+  map.setView([10, -86], 6); // center over Costa Rica
+
+  // Default GEBCO WMS layer
   const bathyLayer = L.tileLayer.wms('https://www.gebco.net/data_and_products/gebco_web_services/web_map_service/mapserv?', {
     layers: 'GEBCO_LATEST',
     format: 'image/png',
@@ -276,18 +283,46 @@ async function initMap() {
     "Distance Rings": rangeCircleLayer
   };
 
-  L.control.layers(baseMaps, overlayMaps).addTo(map);
+  const layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
 
   new L.Control.SpeedInput({ position: 'topright' }).addTo(map);
-
   // Set initial speed from input box
   shipSpeedKnots = parseFloat(document.getElementById('speedInput').value);
-
   // Watch for speed changes and update rings
   document.getElementById('speedInput').addEventListener('input', () => {
     shipSpeedKnots = parseFloat(document.getElementById('speedInput').value);
     updateRangeCircles();
   });
+
+    // 🌊 Load dynamic bathymetry + hillshade tile layers
+    //const tileSets = ['geomapapp_at5035_hillshade']; // optionally fetch from Flask later
+    const tileSets = ['NCEI_Multibeam_Mosaic_90m_hillshade','CR_all_new_0.002_0.002_z_hillshade']; // optionally fetch from Flask later
+
+    tileSets.forEach(name => {
+    const bathyUrl = `/tiles/${name}/{z}/{x}/{y}.png`;
+    //const hillshadeUrl = `/tiles/${name}_hillshade/{z}/{x}/{y}.png`;
+
+    const bathyLayer = L.tileLayer(bathyUrl, { opacity: 0.8, errorTileUrl: '/static/blank.png' });
+    //const hillshadeLayer = L.tileLayer(hillshadeUrl, {
+    //  opacity: 0.3,
+    //  errorTileUrl: '/static/blank.png',
+    //  pane: 'hillshadePane'
+    //});
+
+    // Link hillshade behavior to bathy layer visibility
+    //bathyLayer.on('add', () => hillshadeLayer.addTo(map));
+    //bathyLayer.on('remove', () => map.removeLayer(hillshadeLayer));
+
+    overlayMaps[`Bathymetry: ${name}`] = bathyLayer;
+    layerControl.addOverlay(bathyLayer, `Bathymetry: ${name}`);
+
+    // Optionally show one on load
+    //if (name === 'geomapapp_at5035') {
+    //  bathyLayer.addTo(map);
+    //  hillshadeLayer.addTo(map);
+    //}
+  });
+
 
   // Load track + ship marker
   await updateTrack();
