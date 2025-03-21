@@ -90,13 +90,29 @@
     }
   }
 
+  let lastSpeed = null;
+  let lastCenter = null;
   function updateRangeCircles() {
     if (!shipMarker) return;
   
+    const center = shipMarker.getLatLng();
+    const zoom = map.getZoom();
+  
+    // Decide circle distances based on zoom level
+    let hours;
+    if (zoom >= 13) {
+      hours = [0.083333,0.1666667,0.25];
+    } else if (zoom >= 11) {
+      hours = [0.25, 0.5, 1, 2];
+    } else if (zoom >= 8) {
+      hours = [1, 2, 3, 6];
+    } else {
+      hours = [3, 6, 12, 24];
+    }
+
+    // clear and redraw...
     rangeCircleLayer.clearLayers(); // remove old rings + labels
   
-    const center = shipMarker.getLatLng();
-    const hours = [6, 12, 24];
     const metersPerKnotPerHour = 1852;
   
     for (const h of hours) {
@@ -118,10 +134,11 @@
         center.lng
       );
   
+      const labelText = h < 1 ? `${Math.round(h * 60)} min` : `${h}h`;
       const label = L.marker(labelLatLng, {
         icon: L.divIcon({
           className: 'circle-label',
-          html: `<div>${h}h</div>`,
+          html: `<div>${labelText}</div>`,
           iconSize: [30, 12],
           iconAnchor: [15, 6]
         }),
@@ -144,10 +161,12 @@
     }
 
     // Draw new line
-    trackLine = L.polyline(latlngs, { color: 'red' }).addTo(map);
-
-    // Optional: zoom to new track
-    //map.fitBounds(trackLine.getBounds());
+    trackLine = L.polyline(latlngs, {
+      color: 'blue',
+      weight: 2,
+      opacity: 0.7,
+      renderer: L.canvas() // use faster rendering
+    }).addTo(map);
 
     // Get last point for ship position
     const lastPoint = latlngs[latlngs.length - 1];
@@ -236,6 +255,22 @@
     }
   }
 
+async function fetchAndUpdateShipSpeed() {
+  try {
+    const response = await fetch('/get_speed');
+    const data = await response.json();
+    if (data.speed) {
+      shipSpeedKnots = data.speed;
+      document.getElementById('speedInput').value = shipSpeedKnots.toFixed(2);
+      updateRangeCircles();
+    } else {
+      console.warn("Speed not found in response");
+    }
+  } catch (err) {
+    console.error("Failed to fetch speed:", err);
+  }
+}
+
 async function initMap() {
   map = L.map('map').setView([0, 0], 3);
   L.control.scale({ imperial: false }).addTo(map);
@@ -260,6 +295,7 @@ async function initMap() {
   });
 
   rangeCircleLayer.addTo(map);
+  map.on('zoomend', updateRangeCircles);
 
   // Create the day/night terminator layer
   terminator = L.terminator();
@@ -330,9 +366,14 @@ async function initMap() {
   // Load waypoints
   await loadWaypoints();
 
+  // Run once on load too
+  await fetchAndUpdateShipSpeed();
+
   // Refresh track every 5 min
   setInterval(updateTrack, 5 * 60 * 1000);
   setInterval(loadWaypoints, 5 * 60 * 1000);
+  setInterval(fetchAndUpdateShipSpeed, 5 * 60 * 1000);
+
 }
 
 
