@@ -296,7 +296,7 @@ async function initMap() {
 
     // 🌊 Load dynamic bathymetry + hillshade tile layers
     //const tileSets = ['geomapapp_at5035_hillshade']; // optionally fetch from Flask later
-    const tileSets = ['NCEI_Multibeam_Mosaic_90m_hillshade','CR_all_new_0.002_0.002_z_hillshade']; // optionally fetch from Flask later
+    const tileSets = ['NCEI_Multibeam_Mosaic_90m_hillshade','CR_all_new_0.002_0.002_z_hillshade','halfway_done_0321_hillshade']; // optionally fetch from Flask later
 
     tileSets.forEach(name => {
     const bathyUrl = `/tiles/${name}/{z}/{x}/{y}.png`;
