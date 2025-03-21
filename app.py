@@ -17,6 +17,29 @@ lock = threading.Lock()
 def index():
     return render_template('index.html')
 
+@app.route("/get_speed")
+def get_speed():
+    try:
+        url = "http://www.atlantis.whoi.edu/cgi-bin/db_driven_data/status_screen/update_screen.pl"
+        response = requests.get(url, timeout=15)
+        html = response.text
+
+        # Find "SOG:" and extract the number before "knots"
+        import re
+        #match = re.search(r"SOG:\s*</b>.*?<b>\s*([\d.]+)\s*knots", html, re.IGNORECASE | re.DOTALL)
+        match = re.search(r"SOG:.*?<b>\s*([-\d.]+)\s*knots", html, re.IGNORECASE | re.DOTALL)
+        if match:
+            speed = float(match.group(1))
+            print("got speed: ", speed)
+            return jsonify({"speed": speed})
+        else:
+            print("got speed: error")
+            return jsonify({"error": "SOG not found"}), 500
+
+    except Exception as e:
+        print(f"Error fetching or parsing SOG: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/tiles/<path:filename>')
 def serve_tiles(filename):
     print("Request for:", filename)
