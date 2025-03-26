@@ -27,9 +27,7 @@ pip install -r requirements.txt
 
 ### 3. Run the App
 
-On Windows, just double-click `run_shipmap.bat`
-
-Or, from terminal:
+From terminal:
 
 ```bash
 python app.py
@@ -41,7 +39,8 @@ Then browse to:
 http://localhost:5000/
 ```
 
-> For windows, see [`README-windows.txt`](README-windows.txt) for quick-start instructions. This is untested.
+For windows, see [`README-windows.txt`](README-windows.txt) for quick-start instructions. This is untested.
+
 
 ### Updating the layers:
 
@@ -49,11 +48,13 @@ http://localhost:5000/
 
 *Waypoints:* The file [`waypoints.txt`](waypoints.txt) contains the waypoints to be displayed on the map as location markers. The file format is `decimal_lat,decimal_lon,name`. This has to be updated manually on the computer running the python server. After updating the waypoints file, just refresh any browser window with the map in it (no need to restart the python server).
 
-*Bathymetry:* To add a custom bathymetry layer, take any GeoTiff file (ideally, pre-rendered as a hillshade or other color image using QGIS/ArcMap/etc.) and run this command:
+*Bathymetry:* To add a custom bathymetry layer, take any GeoTiff file (ideally, pre-rendered as a hillshade or other color image using QGIS/ArcMap/etc.) and run this gdal command (you need to have gdal installed):
 
 `gdal2tiles.py --xyz --profile=mercator -z 6-13 input_filename.tif tiles/custom_bathymetry_layer`
 
-The zoom levels (6-13) generally work well for bathymetry layers but you can add higher values if you have very high-resolution images over a small area (takes a long time and generates a lot of tile images), or include lower values if you want to see the layer appear at global scales. When the map is zoomed to a level outside this range, the bathymetry will just disappear. 
+The name of the folder inside the tiles/ folder can be anything you like, it will be dynamically read and displayed as an option in the layers dropdown.
+
+The given zoom levels (6-13) generally work well for bathymetry layers but you can add higher values if you have very high-resolution images over a small area (takes a long time and generates a lot of tile images if your area is too large), or include lower values if you want to see the layer appear at global scales. When the map is zoomed to a level outside this range, the bathymetry will just disappear. 
 
 
 ### Example:
