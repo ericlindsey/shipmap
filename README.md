@@ -40,7 +40,7 @@ For windows, see [`README-windows.txt`](README-windows.txt) for quick-start inst
 
 ### Updating the layers:
 
-*Ship track:* The ship track is pulled dynamically from the file linked in the page at http://www.atlantis.whoi.edu/cgi-bin/imet/get_tracks. This page is read by the python server, and the ship track is parsed from the file named http://www.atlantis.whoi.edu/timages/try_<number>.xy. If this page is not available (for example, if you are not on the R/V Atlantis), then a fallback file containing the track of AT50-35 is loaded from the static/ folder instead.
+*Ship track:* The ship track is pulled dynamically from the file linked in the page at http://www.atlantis.whoi.edu/cgi-bin/imet/get_tracks. This page is read by the python server, and the ship track is parsed from the file named something like http://www.atlantis.whoi.edu/timages/try_NNNN.xy (the number changes constantly). If this page is not available, for example, if you are not on the R/V Atlantis, then a fallback file containing the track of AT50-35 is loaded from the static/ folder instead.
 
 *Waypoints:* The file [`waypoints.txt`](waypoints.txt) contains the waypoints to be displayed on the map as location markers. The file format is `decimal_lat,decimal_lon,name`. This has to be updated manually on the computer running the python server. After updating the waypoints file, just refresh any browser window with the map in it (no need to restart the python server).
 
