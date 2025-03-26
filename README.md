@@ -33,11 +33,7 @@ From terminal:
 python app.py
 ```
 
-Then browse to:
-
-```
-http://localhost:5000/
-```
+This will launch the Flask server, and display the IP address where the server is running, for example 1.1.1.1. Now, open your browser to http://<IP address>:5000/ . This should work from anywhere on the ship. To stop the server, just close the terminal window running the app.
 
 For windows, see [`README-windows.txt`](README-windows.txt) for quick-start instructions. This is untested.
 
