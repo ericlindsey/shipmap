@@ -331,32 +331,17 @@ async function initMap() {
   });
 
     // 🌊 Load dynamic bathymetry + hillshade tile layers
-    //const tileSets = ['geomapapp_at5035_hillshade']; // optionally fetch from Flask later
-    const tileSets = ['NCEI_Multibeam_Mosaic_90m_hillshade','CR_all_new_0.002_0.002_z_hillshade','NIN1_0324_hillshade','shaded_bathy_CR']; // optionally fetch from Flask later
+    const response = await fetch('/tile_sets');
+    const tileSets = await response.json();
 
     tileSets.forEach(name => {
     const bathyUrl = `/tiles/${name}/{z}/{x}/{y}.png`;
-    //const hillshadeUrl = `/tiles/${name}_hillshade/{z}/{x}/{y}.png`;
 
     const bathyLayer = L.tileLayer(bathyUrl, { opacity: 0.8, errorTileUrl: '/static/blank.png' });
-    //const hillshadeLayer = L.tileLayer(hillshadeUrl, {
-    //  opacity: 0.3,
-    //  errorTileUrl: '/static/blank.png',
-    //  pane: 'hillshadePane'
-    //});
-
-    // Link hillshade behavior to bathy layer visibility
-    //bathyLayer.on('add', () => hillshadeLayer.addTo(map));
-    //bathyLayer.on('remove', () => map.removeLayer(hillshadeLayer));
 
     overlayMaps[`Bathymetry: ${name}`] = bathyLayer;
     layerControl.addOverlay(bathyLayer, `Bathymetry: ${name}`);
 
-    // Optionally show one on load
-    //if (name === 'geomapapp_at5035') {
-    //  bathyLayer.addTo(map);
-    //  hillshadeLayer.addTo(map);
-    //}
   });
 
 

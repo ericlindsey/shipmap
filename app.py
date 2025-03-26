@@ -3,6 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import time
 import threading
+import os
 
 app = Flask(__name__)
 
@@ -16,6 +17,26 @@ lock = threading.Lock()
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route("/tile_sets")
+def tile_sets():
+    tile_dir = os.path.join(os.getcwd(), "tiles")
+    try:
+        all_entries = os.listdir(tile_dir)
+        tile_sets = []
+
+        for entry in all_entries:
+            full_path = os.path.join(tile_dir, entry)
+            if os.path.isdir(full_path):
+                # Optional: skip hidden or system folders
+                if entry.startswith(".") or entry == "__pycache__":
+                    continue
+                tile_sets.append(entry)
+
+        return jsonify(sorted(tile_sets))
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/get_speed")
 def get_speed():
