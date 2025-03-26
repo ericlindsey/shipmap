@@ -78,45 +78,72 @@ def get_waypoints():
 @app.route('/get_track_data')
 def get_track_data():
     global last_fetch_time, last_coords
+    try:
+        with lock:
+            now = time.time()
+            if now - last_fetch_time < 240:
+                print("Using cached track data")
+                return jsonify({"track": last_coords})
 
-    with lock:
-        now = time.time()
-        if now - last_fetch_time < 240:
-            print("Using cached track data")
-            return jsonify({"track": last_coords})
+            print("Fetching fresh track data...")
 
-        print("Fetching fresh track data...")
+            res = requests.get(TRACK_PAGE)
+            if not res.ok:
+                return jsonify({"error": "Failed to get track page"}), 500
 
-        res = requests.get(TRACK_PAGE)
-        if not res.ok:
-            return jsonify({"error": "Failed to get track page"}), 500
+            soup = BeautifulSoup(res.text, 'html.parser')
+            link = soup.find('a', href=lambda href: href and href.endswith('.xy'))
+            if not link:
+                raise ValueError("No .xy file link found in HTML")
 
-        soup = BeautifulSoup(res.text, 'html.parser')
-        link = soup.find('a', href=lambda href: href and href.endswith('.xy'))
-        if not link:
-            return jsonify({"error": "No .xy link found"}), 404
+            xy_url = BASE_URL + link['href']
+            print(f"Fetching .xy file from: {xy_url}")
+            track_res = requests.get(xy_url)
+            if not track_res.ok:
+                raise ValueError("Failed to get .xy file")
 
-        xy_url = BASE_URL + link['href']
-        print(f"Fetching .xy file from: {xy_url}")
-        track_res = requests.get(xy_url)
-        if not track_res.ok:
-            return jsonify({"error": "Failed to get .xy file"}), 500
+            lines = track_res.text.strip().splitlines()
+            if not lines:
+                raise ValueError("Downloaded track file is empty")
 
-        lines = track_res.text.strip().splitlines()
-        coords = []
-        for line in lines:
-            try:
-                x_str, y_str = line.strip().split(',')
-                x = float(x_str.strip())
-                y = float(y_str.strip())
-                coords.append({'lat': y, 'lng': x})
-            except ValueError:
-                continue
+            coords = []
+            for line in lines:
+                try:
+                    x_str, y_str = line.strip().split(',')
+                    x = float(x_str.strip())
+                    y = float(y_str.strip())
+                    coords.append({'lat': y, 'lng': x})
+                except ValueError:
+                    continue
 
-        last_fetch_time = now
-        last_coords = coords
-        print(f"Returning {len(coords)} points")
-        return jsonify({"track": coords})
+            last_fetch_time = now
+            last_coords = coords
+            print(f"Returning {len(coords)} points")
+            return jsonify({"track": coords})
+
+    except Exception as e:
+        print(f"Primary source failed, loading default track: {e}")
+
+        try:
+            # Load fallback from local static file
+            with open("default_track.xy") as f:
+                latlngs = []
+                for line in f:
+                    parts = re.split(r'[,\s]+', line.strip())
+                    if len(parts) >= 2:
+                        try:
+                            lon = float(parts[0])
+                            lat = float(parts[1])
+                            latlngs.append([lat, lon])
+                        except ValueError:
+                            continue
+            print(f"Loaded {len(latlngs)} points from fallback")
+            return jsonify({"track": latlngs})
+
+        except Exception as fallback_error:
+            print(f"Fallback failed: {fallback_error}")
+            return jsonify({"track": [], "error": str(fallback_error)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
